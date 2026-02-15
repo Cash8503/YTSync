@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT-Sync Player</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:     #080809;
+  --surf:   #111114;
+  --surf2:  #18181e;
+  --surf3:  #202028;
+  --border: #272730;
+  --red:    #ff3b3b;
+  --green:  #1ddc82;
+  --blue:   #4a9eff;
+  --yellow: #ffd60a;
+  --text:   #e8e8f0;
+  --muted:  #5a5a70;
+  --mono:   'DM Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+/* Layout */
+.app { display: grid; grid-template-rows: 46px 1fr; grid-template-columns: 1fr 300px; height: 100vh; }
+
+/* Header */
+.header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 12px; padding: 0 20px;
+  background: var(--surf); border-bottom: 1px solid var(--border); z-index: 20;
+}
+.logo { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; }
+.logo-box { width: 26px; height: 26px; background: var(--red); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.now-chip { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hsep { flex: 1; }
+.hbtn { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surf2); color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.hbtn:hover { border-color: var(--muted); }
+
+/* Player area */
+.player-area { display: flex; flex-direction: column; background: #000; overflow: hidden; position: relative; }
+.video-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-height: 0; cursor: pointer; position: relative; }
+video { max-width: 100%; max-height: 100%; display: block; outline: none; }
+
+/* Audio art */
+.audio-art { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--muted); padding: 40px; text-align: center; width: 100%; height: 100%; }
+.audio-art .ai { font-size: 80px; opacity: .15; }
+.audio-art .at { font-size: 20px; font-weight: 800; color: var(--text); max-width: 420px; line-height: 1.3; }
+.audio-art .au { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+.audio-art.vis { display: flex; }
+
+/* Flash */
+.flash { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 64px; pointer-events: none; opacity: 0; transition: opacity .3s; }
+.flash.show { opacity: 1; }
+
+/* Controls */
+.controls { background: linear-gradient(transparent, rgba(0,0,0,.96)); padding: 10px 20px 14px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+
+/* Progress */
+.prog-row { display: flex; align-items: center; gap: 10px; }
+.prog-wrap { flex: 1; height: 4px; background: rgba(255,255,255,.15); border-radius: 2px; cursor: pointer; position: relative; transition: height .15s; }
+.prog-wrap:hover { height: 7px; }
+.prog-buf  { position: absolute; top: 0; left: 0; height: 100%; background: rgba(255,255,255,.2); border-radius: 2px; pointer-events: none; }
+.prog-fill { height: 100%; background: var(--red); border-radius: 2px; pointer-events: none; position: relative; z-index: 1; }
+.prog-thumb { position: absolute; top: 50%; width: 12px; height: 12px; background: #fff; border-radius: 50%; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 2; }
+.prog-wrap:hover .prog-thumb { opacity: 1; }
+.timetxt { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 35px; }
+.timetxt.right { text-align: right; }
+
+/* Control row */
+.ctrl-row { display: flex; align-items: center; gap: 4px; }
+.cbtn { background: none; border: none; cursor: pointer; color: var(--text); font-size: 18px; padding: 4px 7px; border-radius: 6px; transition: background .15s, color .15s; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.cbtn:hover { background: rgba(255,255,255,.1); }
+.cbtn.on { color: var(--red); }
+.cbtn.play { font-size: 28px; padding: 2px 8px; }
+.csep { flex: 1; }
+.vol-wrap { display: flex; align-items: center; gap: 6px; }
+.vol-sl { -webkit-appearance: none; appearance: none; width: 76px; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; outline: none; cursor: pointer; }
+.vol-sl::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; cursor: pointer; }
+.spd-btn { font-family: var(--mono); font-size: 11px; font-weight: 500; background: var(--surf3); border: 1px solid var(--border); color: var(--text); padding: 3px 8px; border-radius: 5px; cursor: pointer; min-width: 32px; text-align: center; }
+.spd-btn:hover { border-color: var(--muted); }
+
+/* Sidebar */
+.sidebar { border-left: 1px solid var(--border); background: var(--surf); display: flex; flex-direction: column; overflow: hidden; }
+.pl-sel-wrap { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.pl-sel-wrap select { width: 100%; font-family: var(--mono); font-size: 11px; background: var(--surf2); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 6px; outline: none; }
+.search-wrap { padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.search-wrap input { width: 100%; font-family: var(--mono); font-size: 11px; background: var(--surf2); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 6px; outline: none; }
+.search-wrap input::placeholder { color: var(--muted); }
+.search-wrap input:focus { border-color: var(--blue); }
+.filters { padding: 6px 12px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; flex-shrink: 0; flex-wrap: wrap; }
+.fbtn { font-family: var(--mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer; transition: all .15s; }
+.fbtn.on { background: rgba(74,158,255,.15); color: var(--blue); border-color: rgba(74,158,255,.4); }
+
+/* Track list */
+.tracklist { flex: 1; overflow-y: auto; }
+.track { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; transition: background .1s; border-bottom: 1px solid rgba(255,255,255,.03); position: relative; }
+.track:hover { background: var(--surf2); }
+.track.active { background: rgba(74,158,255,.1); }
+.track.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--red); border-radius: 0 2px 2px 0; }
+.track.na { opacity: .4; cursor: not-allowed; }
+.track.na:hover { background: none; }
+.tthumb { width: 44px; height: 25px; border-radius: 3px; object-fit: cover; background: var(--surf3); flex-shrink: 0; display: block; }
+.tinfo { flex: 1; min-width: 0; }
+.ttitle { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tmeta { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.tnum { font-family: var(--mono); font-size: 10px; color: var(--muted); flex-shrink: 0; width: 18px; text-align: right; }
+.track.active .tnum { opacity: 0; }
+.track.active::after { content: '▶'; position: absolute; left: 13px; font-size: 9px; color: var(--red); top: 50%; transform: translateY(-50%); }
+
+.sf { padding: 8px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.sf-info { font-family: var(--mono); font-size: 10px; color: var(--muted); flex: 1; }
+.sf-btn { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 10px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surf2); color: var(--text); cursor: pointer; }
+.sf-btn:hover { border-color: var(--muted); }
+
+/* Keyboard hint */
+#kbhint { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(8,8,9,.92); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; display: none; grid-template-columns: auto auto; gap: 5px 22px; backdrop-filter: blur(10px); z-index: 100; }
+#kbhint.show { display: grid; }
+#kbhint dt { color: var(--blue); font-family: var(--mono); font-size: 11px; font-weight: 700; }
+#kbhint dd { color: var(--muted); font-size: 11px; }
+
+/* Toast */
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(30px); background: var(--surf2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; opacity: 0; transition: all .2s; z-index: 200; white-space: nowrap; }
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.err { border-color: var(--red); color: var(--red); }
+
+/* Empty */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--muted); text-align: center; padding: 40px; }
+.empty .ei { font-size: 48px; opacity: .12; }
+.empty .et { font-size: 15px; font-weight: 700; color: var(--text); }
+.empty .es { font-size: 12px; line-height: 1.7; max-width: 240px; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-box">▶</div>
+      YT<span style="color:var(--muted);font-weight:400">–</span>Sync
+      <span style="color:var(--muted);font-weight:400;font-size:12px;margin-left:2px">/ Player</span>
+    </div>
+    <div class="now-chip" id="now-chip">Nothing playing</div>
+    <div class="hsep"></div>
+    <button class="hbtn" onclick="document.getElementById('kbhint').classList.toggle('show')" title="Keyboard shortcuts">⌨</button>
+    <a href="/" class="hbtn">Manager ↗</a>
+  </header>
+
+  <!-- Player -->
+  <div class="player-area">
+    <div class="video-wrap" id="video-wrap" onclick="handleVideoClick()">
+      <video id="vid" preload="metadata" tabindex="-1"></video>
+      <div class="audio-art" id="audio-art">
+        <div class="ai">🎵</div>
+        <div class="at" id="aud-title">—</div>
+        <div class="au" id="aud-uploader">—</div>
+      </div>
+      <div class="flash" id="flash">▶</div>
+    </div>
+
+    <div class="controls">
+      <!-- Progress row -->
+      <div class="prog-row">
+        <span class="timetxt" id="t-cur">0:00</span>
+        <div class="prog-wrap" id="prog-wrap" onclick="seekClick(event)" onmousemove="seekMove(event)">
+          <div class="prog-buf"  id="prog-buf"  style="width:0%"></div>
+          <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+          <div class="prog-thumb" id="prog-thumb" style="left:0%"></div>
+        </div>
+        <span class="timetxt right" id="t-dur">0:00</span>
+      </div>
+
+      <!-- Button row -->
+      <div class="ctrl-row">
+        <button class="cbtn"      id="btn-shuf"  onclick="toggleShuffle()" title="Shuffle (S)">⇄</button>
+        <button class="cbtn"                     onclick="prevTrack()"     title="Prev (P or ←)">⏮</button>
+        <button class="cbtn play" id="btn-play"  onclick="togglePlay()"    title="Play/Pause (Space)">▶</button>
+        <button class="cbtn"                     onclick="nextTrack()"     title="Next (N or →)">⏭</button>
+        <button class="cbtn"      id="btn-loop"  onclick="cycleLoop()"     title="Loop (L)">↻</button>
+        <div class="csep"></div>
+        <div class="vol-wrap">
+          <button class="cbtn" id="btn-mute" onclick="toggleMute()" title="Mute (M)" style="font-size:15px">🔊</button>
+          <input  class="vol-sl" type="range" id="vol-sl" min="0" max="1" step="0.02" value="1" oninput="setVol(this.value)">
+        </div>
+        <div class="csep"></div>
+        <button class="spd-btn" id="spd-btn" onclick="cycleSpeed()" title="Playback speed">1×</button>
+        <button class="cbtn" onclick="toggleFS()" title="Fullscreen (F)" style="font-size:16px">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="pl-sel-wrap">
+      <select id="pl-sel" onchange="loadPlaylist(this.value)">
+        <option value="">— Select a playlist —</option>
+      </select>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="Search titles…" oninput="filterTracks()">
+    </div>
+
+    <div class="filters">
+      <button class="fbtn on" id="f-all"   onclick="setFilter('all')">All</button>
+      <button class="fbtn"    id="f-dl"    onclick="setFilter('dl')">Downloaded</button>
+      <button class="fbtn"    id="f-audio" onclick="setFilter('audio')">Audio</button>
+      <button class="fbtn"    id="f-video" onclick="setFilter('video')">Video</button>
+    </div>
+
+    <div class="tracklist" id="tracklist">
+      <div class="empty">
+        <div class="ei">📂</div>
+        <div class="et">No playlist selected</div>
+        <div class="es">Pick a playlist above to browse your downloaded media.</div>
+      </div>
+    </div>
+
+    <div class="sf">
+      <div class="sf-info" id="sf-info">—</div>
+      <button class="sf-btn" onclick="shuffleAll()">⇄ All</button>
+    </div>
+  </aside>
+
+</div>
+
+<!-- Keyboard hint -->
+<dl id="kbhint">
+  <dt>Space</dt>   <dd>Play / Pause</dd>
+  <dt>← / →</dt>  <dd>Seek ±10s</dd>
+  <dt>↑ / ↓</dt>  <dd>Volume ±10%</dd>
+  <dt>P / N</dt>   <dd>Prev / Next track</dd>
+  <dt>S</dt>       <dd>Toggle shuffle</dd>
+  <dt>L</dt>       <dd>Cycle loop</dd>
+  <dt>M</dt>       <dd>Mute</dd>
+  <dt>F</dt>       <dd>Fullscreen</dd>
+  <dt>? / ⌨</dt>  <dd>Toggle this panel</dd>
+</dl>
+
+<div id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let playlist   = [];   // full list from server
+let filtered   = [];   // after search + filter
+let curIdx     = -1;   // index into filtered
+let shuffle    = false;
+let loopMode   = 0;    // 0=off 1=all 2=one
+let spdIdx     = 2;
+const SPEEDS   = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+let activePlId = null;
+let curFilter  = 'all';
+
+const vid  = document.getElementById('vid');
+const pf   = document.getElementById('prog-fill');
+const pb   = document.getElementById('prog-buf');
+const pt   = document.getElementById('prog-thumb');
+const tcur = document.getElementById('t-cur');
+const tdur = document.getElementById('t-dur');
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await fetchPlaylists();
+  const lastPl  = sessionStorage.getItem('yts-pl');
+  const lastIdx = sessionStorage.getItem('yts-idx');
+  if (lastPl) {
+    document.getElementById('pl-sel').value = lastPl;
+    await loadPlaylist(lastPl, lastIdx != null ? parseInt(lastIdx) : -1);
+  }
+  wireVideoEvents();
+  wireKeys();
+}
+
+// ─── Playlists ────────────────────────────────────────────────────────────────
+async function fetchPlaylists() {
+  try {
+    const d   = await get('/api/playlists');
+    const sel = document.getElementById('pl-sel');
+    sel.innerHTML = '<option value="">— Select a playlist —</option>';
+    for (const pl of d.playlists) {
+      const dl  = pl.videos.filter(v => v.downloaded).length;
+      const opt = document.createElement('option');
+      opt.value       = pl.id;
+      opt.textContent = `${pl.title} (${dl}/${pl.videos.length})`;
+      sel.appendChild(opt);
+    }
+  } catch(e) { toast('Cannot reach YT-Sync server', true); }
+}
+
+async function loadPlaylist(plId, autoIdx) {
+  if (!plId) { playlist = []; filtered = []; renderList(); return; }
+  activePlId = plId;
+  sessionStorage.setItem('yts-pl', plId);
+  try {
+    const pl  = await get(`/api/playlist/${plId}`);
+    playlist  = pl.videos;
+    filterTracks();
+    prefetchThumbs(pl);
+    if (autoIdx != null && autoIdx >= 0 && autoIdx < filtered.length) {
+      playTrack(autoIdx);
+    }
+  } catch(e) { toast('Failed to load playlist', true); }
+}
+
+// ─── Filtering ────────────────────────────────────────────────────────────────
+function filterTracks() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  filtered = playlist.filter(v => {
+    if (q && !v.title.toLowerCase().includes(q) && !(v.uploader||'').toLowerCase().includes(q)) return false;
+    if (curFilter === 'dl')    return v.downloaded;
+    if (curFilter === 'audio') return v.downloaded && (v.audio_only || /\.mp3$/i.test(v.file_path||''));
+    if (curFilter === 'video') return v.downloaded && !v.audio_only && !/\.mp3$/i.test(v.file_path||'');
+    return true;
+  });
+  renderList();
+  updateFooter();
+}
+
+function setFilter(f) {
+  curFilter = f;
+  ['all','dl','audio','video'].forEach(id => document.getElementById('f-'+id).classList.toggle('on', id === f));
+  filterTracks();
+}
+
+// ─── Track list render ────────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('tracklist');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">🔍</div><div class="et">No results</div><div class="es">Try a different search or filter.</div></div>`;
+    return;
+  }
+  // Preserve scroll position
+  const prevScroll = el.scrollTop;
+
+  el.innerHTML = filtered.map((v, i) => {
+    const dl    = v.downloaded;
+    const isAud = v.audio_only || /\.mp3$/i.test(v.file_path||'');
+    const dur   = v.duration ? fmtTime(v.duration) : '—';
+    const tag   = dl ? (isAud ? '♪' : '▶') : '✕';
+    const col   = dl ? 'var(--green)' : 'var(--red)';
+    const thumb = `<img class="tthumb" src="/api/thumb/${v.id}" loading="lazy" onerror="this.style.opacity=0.2">`;
+
+    return `<div class="track${i===curIdx?' active':''}${!dl?' na':''}" id="tr-${i}"
+                 onclick="${dl ? `playTrack(${i})` : 'toast(\"Not downloaded yet\",true)'}">
+      <span class="tnum">${i+1}</span>
+      ${thumb}
+      <div class="tinfo">
+        <div class="ttitle" title="${esc(v.title)}">${esc(v.title)}</div>
+        <div class="tmeta">${esc(v.uploader||'')} · ${dur} · <span style="color:${col}">${tag}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.scrollTop = prevScroll;
+}
+
+function highlightTrack(idx) {
+  document.querySelectorAll('.track').forEach((el, i) => el.classList.toggle('active', i === idx));
+  const el = document.getElementById('tr-'+idx);
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function updateFooter() {
+  const dl    = filtered.filter(v => v.downloaded).length;
+  document.getElementById('sf-info').textContent = `${dl} / ${filtered.length} downloaded`;
+}
+
+// ─── Playback ─────────────────────────────────────────────────────────────────
+function playTrack(idx) {
+  if (idx < 0 || idx >= filtered.length) return;
+  const v = filtered[idx];
+  if (!v.downloaded || !v.file_path) { toast('Not downloaded', true); return; }
+
+  curIdx = idx;
+  sessionStorage.setItem('yts-idx', idx);
+  highlightTrack(idx);
+
+  const isAud = v.audio_only || /\.mp3$/i.test(v.file_path||'');
+  const url   = `/api/stream/${activePlId}/${v.id}`;
+
+  const art = document.getElementById('audio-art');
+  if (isAud) {
+    vid.style.display = 'none';
+    art.classList.add('vis');
+    document.getElementById('aud-title').textContent    = v.title;
+    document.getElementById('aud-uploader').textContent = v.uploader || '';
+  } else {
+    vid.style.display = 'block';
+    art.classList.remove('vis');
+  }
+
+  vid.src = url;
+  vid.load();
+  vid.play().catch(() => {});
+  vid.playbackRate = SPEEDS[spdIdx];
+
+  document.getElementById('now-chip').textContent = '▶ ' + v.title;
+  document.title = '▶ ' + v.title + ' — YT-Sync';
+  clearProgress();
+}
+
+function handleVideoClick() {
+  // Only toggle play if click is on background (not controls)
+  togglePlay();
+}
+
+function togglePlay() {
+  if (!vid.src) { toast('Select a track first'); return; }
+  if (vid.paused) { vid.play(); doFlash('▶'); }
+  else            { vid.pause(); doFlash('⏸'); }
+}
+
+function prevTrack() {
+  if (curIdx <= 0) { vid.currentTime = 0; return; }
+  playTrack(curIdx - 1);
+}
+
+function nextTrack() {
+  if (loopMode === 2) { vid.currentTime = 0; vid.play(); return; }
+  if (shuffle) {
+    const dl  = filtered.map((v,i) => v.downloaded ? i : -1).filter(i => i >= 0);
+    if (dl.length) playTrack(dl[Math.floor(Math.random() * dl.length)]);
+    return;
+  }
+  if (curIdx < filtered.length - 1) playTrack(curIdx + 1);
+  else if (loopMode === 1) playTrack(0);
+}
+
+function shuffleAll() {
+  if (!filtered.length) return;
+  shuffle = true;
+  document.getElementById('btn-shuf').classList.add('on');
+  const dl = filtered.map((v,i) => v.downloaded ? i : -1).filter(i => i >= 0);
+  if (dl.length) playTrack(dl[Math.floor(Math.random() * dl.length)]);
+}
+
+function toggleShuffle() {
+  shuffle = !shuffle;
+  document.getElementById('btn-shuf').classList.toggle('on', shuffle);
+  toast(shuffle ? '⇄ Shuffle on' : '⇄ Shuffle off');
+}
+
+const LOOP_ICONS = ['↻','↻¹','↺'];
+function cycleLoop() {
+  loopMode = (loopMode + 1) % 3;
+  const btn = document.getElementById('btn-loop');
+  btn.classList.toggle('on', loopMode > 0);
+  btn.textContent = LOOP_ICONS[loopMode];
+  vid.loop = (loopMode === 2);
+  toast(['Loop off','Loop all','Loop one'][loopMode]);
+}
+
+// ─── Volume / Speed ───────────────────────────────────────────────────────────
+function setVol(v) {
+  vid.volume = parseFloat(v);
+  vid.muted  = false;
+  const icon = v < 0.01 ? '🔇' : v < 0.5 ? '🔉' : '🔊';
+  document.getElementById('btn-mute').textContent = icon;
+  document.getElementById('vol-sl').value = v;
+}
+function toggleMute() {
+  vid.muted = !vid.muted;
+  document.getElementById('btn-mute').textContent = vid.muted ? '🔇' : vid.volume < 0.5 ? '🔉' : '🔊';
+}
+function cycleSpeed() {
+  spdIdx = (spdIdx + 1) % SPEEDS.length;
+  const s = SPEEDS[spdIdx];
+  vid.playbackRate = s;
+  document.getElementById('spd-btn').textContent = s + '×';
+  toast(s + '× speed');
+}
+
+// ─── Progress ─────────────────────────────────────────────────────────────────
+function clearProgress() {
+  pf.style.width = '0%'; pb.style.width = '0%';
+  pt.style.left  = '0%'; tcur.textContent = '0:00'; tdur.textContent = '0:00';
+}
+function seekClick(e) {
+  const r = document.getElementById('prog-wrap').getBoundingClientRect();
+  const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  if (vid.duration) vid.currentTime = p * vid.duration;
+}
+function seekMove(e) {
+  const r = document.getElementById('prog-wrap').getBoundingClientRect();
+  const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  pt.style.left = (p * 100) + '%';
+}
+
+function wireVideoEvents() {
+  vid.addEventListener('timeupdate', () => {
+    if (!vid.duration) return;
+    const p = vid.currentTime / vid.duration * 100;
+    pf.style.width = p + '%'; pt.style.left = p + '%';
+    tcur.textContent = fmtTime(Math.floor(vid.currentTime));
+    tdur.textContent = fmtTime(Math.floor(vid.duration));
+  });
+  vid.addEventListener('progress', () => {
+    if (!vid.duration || !vid.buffered.length) return;
+    pb.style.width = (vid.buffered.end(vid.buffered.length-1) / vid.duration * 100) + '%';
+  });
+  vid.addEventListener('play',  () => document.getElementById('btn-play').textContent = '⏸');
+  vid.addEventListener('pause', () => document.getElementById('btn-play').textContent = '▶');
+  vid.addEventListener('ended', nextTrack);
+  vid.addEventListener('error', () => toast('Playback error — file may have moved', true));
+  vid.addEventListener('loadedmetadata', () => tdur.textContent = fmtTime(Math.floor(vid.duration)));
+}
+
+// ─── Fullscreen ───────────────────────────────────────────────────────────────
+function toggleFS() {
+  const w = document.getElementById('video-wrap');
+  if (!document.fullscreenElement) w.requestFullscreen();
+  else document.exitFullscreen();
+}
+
+// ─── Flash ────────────────────────────────────────────────────────────────────
+let _ft;
+function doFlash(icon) {
+  const el = document.getElementById('flash');
+  el.textContent = icon; el.classList.add('show');
+  clearTimeout(_ft); _ft = setTimeout(() => el.classList.remove('show'), 500);
+}
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+function wireKeys() {
+  document.addEventListener('keydown', e => {
+    if (['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+    switch(e.code) {
+      case 'Space':      e.preventDefault(); togglePlay(); break;
+      case 'ArrowLeft':  e.preventDefault(); vid.currentTime = Math.max(0, vid.currentTime-10); break;
+      case 'ArrowRight': e.preventDefault(); vid.currentTime = Math.min(vid.duration||0, vid.currentTime+10); break;
+      case 'ArrowUp':    e.preventDefault(); setVol(Math.min(1, vid.volume+0.1)); break;
+      case 'ArrowDown':  e.preventDefault(); setVol(Math.max(0, vid.volume-0.1)); break;
+      case 'KeyP':       prevTrack(); break;
+      case 'KeyN':       nextTrack(); break;
+      case 'KeyS':       toggleShuffle(); break;
+      case 'KeyL':       cycleLoop(); break;
+      case 'KeyM':       toggleMute(); break;
+      case 'KeyF':       toggleFS(); break;
+      case 'Slash':
+        if (e.shiftKey) document.getElementById('kbhint').classList.toggle('show');
+        break;
+    }
+  });
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function get(path) { const r = await fetch(path); return r.json(); }
+
+function fmtTime(s) {
+  s = Math.floor(s||0);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _tt;
+function toast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(_tt); _tt = setTimeout(() => t.className = '', 2800);
+}
+
+
+async function prefetchThumbs(pl) {
+  if (!pl || !pl.videos) return;
+  const ids = pl.videos.map(v => v.id).filter(Boolean).slice(0, 50);
+  if (!ids.length) return;
+  try { await fetch(`/api/thumbs/prefetch?ids=${ids.join(',')}`); } catch(e) {}
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT-Sync</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:       #0c0c0f;
+  --surf:     #141418;
+  --surf2:    #1c1c22;
+  --surf3:    #22222a;
+  --border:   #2a2a35;
+  --red:      #ff3b3b;
+  --red-dim:  rgba(255,59,59,0.14);
+  --green:    #1ddc82;
+  --grn-dim:  rgba(29,220,130,0.12);
+  --yellow:   #ffd60a;
+  --ylw-dim:  rgba(255,214,10,0.12);
+  --blue:     #4a9eff;
+  --blu-dim:  rgba(74,158,255,0.12);
+  --text:     #e8e8f0;
+  --muted:    #6b6b80;
+  --mono:     'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(12,12,15,0.95);
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+  z-index: 50;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+}
+.logo-box {
+  width: 32px; height: 32px; background: var(--red);
+  border-radius: 7px; display: flex; align-items: center;
+  justify-content: center; font-size: 15px;
+}
+.header-mid { flex: 1; display: flex; align-items: center; gap: 8px; }
+.status-chip {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  padding: 4px 10px; border-radius: 99px;
+  background: var(--surf2); border: 1px solid var(--border);
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot-green  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+.dot-red    { background: var(--red); }
+.dot-yellow { background: var(--yellow); animation: blink 1s infinite; }
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+/* ── Buttons ── */
+.btn {
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 12px;
+  padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer;
+  transition: all .15s; display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: #e02f2f; }
+.btn-ghost { background: var(--surf2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--muted); }
+.btn-green { background: var(--grn-dim); color: var(--green); border: 1px solid rgba(29,220,130,.3); }
+.btn-green:hover { background: rgba(29,220,130,.22); }
+.btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,59,59,.3); }
+.btn-danger:hover { background: rgba(255,59,59,.22); }
+.btn-blue { background: var(--blu-dim); color: var(--blue); border: 1px solid rgba(74,158,255,.3); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn-sm { padding: 5px 9px; font-size: 11px; }
+
+/* ── Layout ── */
+.body-wrap {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-top {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sidebar-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+}
+.pl-list { flex: 1; overflow-y: auto; padding: 6px; }
+.pl-item {
+  padding: 9px 10px; border-radius: 7px; cursor: pointer;
+  transition: background .1s; border: 1px solid transparent;
+}
+.pl-item:hover { background: var(--surf2); }
+.pl-item.active { background: var(--surf2); border-color: var(--border); }
+.pl-name {
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pl-meta { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+/* ── Main content ── */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.content-head {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0;
+}
+.content-title { font-size: 18px; font-weight: 800; }
+.content-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+.content-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.toolbar {
+  padding: 9px 24px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf); flex-shrink: 0;
+}
+.toolbar-sep { flex: 1; }
+.sel-badge {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  background: var(--surf2); padding: 3px 8px; border-radius: 5px;
+}
+
+/* ── Video table ── */
+.video-list { flex: 1; overflow-y: auto; }
+
+.vrow {
+  display: grid;
+  grid-template-columns: 26px 60px 1fr 72px 100px 100px;
+  align-items: center; gap: 10px;
+  padding: 8px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  transition: background .1s;
+}
+.vrow:hover { background: var(--surf); }
+.vrow.vrow-head {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.3px;
+  text-transform: uppercase; color: var(--muted);
+  background: var(--surf2);
+  padding: 6px 24px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 5;
+}
+.vrow.downloading { background: rgba(74,158,255,.04); }
+.vrow.done-row    { background: rgba(29,220,130,.03); }
+
+.thumb {
+  width: 60px; height: 34px; border-radius: 4px;
+  object-fit: cover; background: var(--surf2);
+  display: block;
+}
+
+.vtitle { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vup    { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+/* inline progress for downloading rows */
+.vrow-progress { margin-top: 4px; }
+.vrow-progress-bar { height: 2px; background: var(--surf3); border-radius: 1px; overflow: hidden; }
+.vrow-progress-fill { height: 100%; background: var(--blue); border-radius: 1px; transition: width .4s; }
+.vrow-progress-info {
+  font-size: 9px; color: var(--muted); font-family: var(--mono);
+  margin-top: 2px; display: flex; gap: 8px;
+}
+
+.vdur { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: center; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 99px;
+  font-size: 10px; font-weight: 600; font-family: var(--mono);
+}
+.pill-green  { background: var(--grn-dim); color: var(--green); }
+.pill-gray   { background: var(--surf2); color: var(--muted); }
+.pill-blue   { background: var(--blu-dim); color: var(--blue); }
+.pill-yellow { background: var(--ylw-dim); color: var(--yellow); }
+.pill-red    { background: var(--red-dim); color: var(--red); }
+
+.vactions { display: flex; gap: 4px; justify-content: flex-end; }
+
+/* ── Downloads panel (always-visible bottom bar when active) ── */
+#dl-panel {
+  border-top: 2px solid var(--border);
+  background: var(--surf);
+  flex-shrink: 0;
+  display: none;
+  flex-direction: column;
+  max-height: 240px;
+}
+#dl-panel.open { display: flex; }
+
+.dl-panel-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dl-panel-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.3px;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.dl-panel-counts { display: flex; gap: 6px; }
+.dl-body { overflow-y: auto; flex: 1; }
+
+.dl-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 110px 80px 70px 60px;
+  align-items: center; gap: 12px;
+  padding: 7px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  font-size: 11px;
+}
+.dl-row:last-child { border-bottom: none; }
+
+.dl-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.dl-bar-wrap { position: relative; }
+.dl-bar { height: 4px; background: var(--surf3); border-radius: 2px; overflow: hidden; }
+.dl-bar-fill { height: 100%; border-radius: 2px; transition: width .5s; }
+.dl-bar-fill.running { background: var(--blue); }
+.dl-bar-fill.done    { background: var(--green); }
+.dl-bar-fill.error   { background: var(--red); }
+.dl-bar-fill.queued  { background: var(--muted); width: 100% !important; opacity: .3; }
+
+.dl-pct { font-family: var(--mono); font-size: 11px; font-weight: 500; text-align: right; min-width: 38px; }
+.dl-speed { font-family: var(--mono); font-size: 10px; color: var(--blue); text-align: right; }
+.dl-eta   { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: right; }
+.dl-size  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+.phase-tag {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase; padding: 1px 5px;
+  border-radius: 3px;
+}
+.phase-tag.downloading { background: var(--blu-dim); color: var(--blue); }
+.phase-tag.video       { background: var(--blu-dim); color: var(--blue); }
+.phase-tag.audio       { background: var(--ylw-dim); color: var(--yellow); }
+.phase-tag.merging     { background: rgba(160,90,255,.15); color: #b06aff; }
+.phase-tag.converting  { background: rgba(160,90,255,.15); color: #b06aff; }
+.phase-tag.queued      { background: var(--surf2); color: var(--muted); }
+.phase-tag.done        { background: var(--grn-dim); color: var(--green); }
+.phase-tag.error       { background: var(--red-dim); color: var(--red); }
+.phase-tag.starting    { background: var(--surf2); color: var(--muted); }
+
+/* ── Modals ── */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.72); z-index: 500;
+  align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: 14px; padding: 26px; width: 460px; max-width: 95vw;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+}
+.modal-title { font-size: 17px; font-weight: 800; margin-bottom: 18px; }
+.form-group  { margin-bottom: 14px; }
+.form-label  { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; display: block; letter-spacing: .5px; }
+.form-row    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+select, input[type="text"], input[type="url"], input[type="number"] {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--surf2); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 10px; border-radius: 7px;
+  outline: none; width: 100%; transition: border-color .15s;
+}
+select:focus, input:focus { border-color: var(--blue); }
+
+.chk-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; cursor: pointer;
+  padding: 8px 10px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surf2);
+  transition: border-color .15s;
+}
+.chk-label:hover { border-color: var(--muted); }
+.chk-label input { accent-color: var(--red); width: 15px; height: 15px; }
+
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── Empty states ── */
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1; padding: 60px; text-align: center; gap: 14px;
+}
+.empty-icon  { font-size: 56px; opacity: .15; }
+.empty-title { font-size: 20px; font-weight: 800; }
+.empty-sub   { color: var(--muted); font-size: 13px; max-width: 340px; line-height: 1.6; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 10px 16px;
+  font-size: 12px; font-weight: 600; z-index: 999;
+  transform: translateY(60px); opacity: 0; transition: all .25s;
+  max-width: 320px;
+}
+#toast.show     { transform: translateY(0); opacity: 1; }
+#toast.t-ok     { border-color: var(--green); color: var(--green); }
+#toast.t-err    { border-color: var(--red); color: var(--red); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 10px; height: 10px;
+  border: 2px solid var(--border); border-top-color: var(--blue);
+  border-radius: 50%; animation: spin .7s linear infinite;
+  vertical-align: middle;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-box">▶</div>
+    YT<span style="color:var(--muted);font-weight:400">–</span>Sync
+  </div>
+  <div class="header-mid">
+    <div class="status-chip">
+      <span class="dot dot-red" id="ydlp-dot"></span>
+      <span id="ydlp-txt">checking...</span>
+    </div>
+    <div class="status-chip" id="thread-chip" style="display:none">
+      <span style="color:var(--blue)">⚡</span>
+      <span id="thread-txt">3 threads</span>
+    </div>
+    <div class="status-chip" id="active-chip" style="display:none;border-color:rgba(74,158,255,.4)">
+      <span class="spinner"></span>
+      <span id="active-txt">0 downloading</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost" onclick="openSettings()">⚙ Settings</button>
+    <button class="btn btn-primary" onclick="openAddPlaylist()">+ Add Playlist</button>
+  </div>
+</header>
+
+<!-- Body -->
+<div class="body-wrap">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <span class="sidebar-label">Playlists</span>
+      <button class="btn btn-ghost" style="width:100%" onclick="openAddPlaylist()">+ Add</button>
+    </div>
+    <div class="pl-list" id="pl-list">
+      <div style="padding:20px;color:var(--muted);font-size:11px;text-align:center">Loading…</div>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <div class="content" id="content">
+    <div class="empty">
+      <div class="empty-icon">📺</div>
+      <div class="empty-title">No playlist selected</div>
+      <div class="empty-sub">Add a YouTube playlist or video URL on the left to get started.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Download Panel (bottom) -->
+<div id="dl-panel">
+  <div class="dl-panel-head">
+    <div class="dl-panel-title">
+      <span class="spinner"></span>
+      Downloads
+    </div>
+    <div class="dl-panel-counts">
+      <span class="pill pill-blue" id="panel-running">0 active</span>
+      <span class="pill pill-yellow" id="panel-queued" style="display:none">0 queued</span>
+      <span class="pill pill-green" id="panel-done" style="display:none">0 done</span>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" onclick="clearFinished()">Clear finished</button>
+    <button class="btn btn-ghost btn-sm" onclick="togglePanel()">✕</button>
+  </div>
+  <div class="dl-body" id="dl-body"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Modal: Add Playlist -->
+<div class="modal-bg" id="m-add">
+  <div class="modal">
+    <div class="modal-title">Add Playlist or Video</div>
+    <div class="form-group">
+      <label class="form-label">YouTube URL</label>
+      <input type="url" id="add-url" placeholder="https://www.youtube.com/playlist?list=… or /watch?v=…">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-add')">Cancel</button>
+      <button class="btn btn-primary" onclick="addPlaylist()">Fetch & Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Video -->
+<div class="modal-bg" id="m-addvid">
+  <div class="modal">
+    <div class="modal-title">Add Video to Playlist</div>
+    <div class="form-group">
+      <label class="form-label">Video URL</label>
+      <input type="url" id="addvid-url" placeholder="https://www.youtube.com/watch?v=…">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-addvid')">Cancel</button>
+      <button class="btn btn-primary" onclick="addVideo()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Download -->
+<div class="modal-bg" id="m-dl">
+  <div class="modal">
+    <div class="modal-title">Download <span id="dl-count">0</span> video(s)</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Quality</label>
+        <select id="dl-quality">
+          <option value="best">Best Available</option>
+          <option value="1080p">1080p</option>
+          <option value="720p" selected>720p</option>
+          <option value="480p">480p</option>
+          <option value="360p">360p</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Format</label>
+        <label class="chk-label">
+          <input type="checkbox" id="dl-audio"> Audio only (MP3)
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-dl')">Cancel</button>
+      <button class="btn btn-primary" onclick="startDownload()">Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Settings -->
+<div class="modal-bg" id="m-settings">
+  <div class="modal">
+    <div class="modal-title">⚙ Settings</div>
+    <div class="form-group">
+      <label class="form-label">Download Directory</label>
+      <input type="text" id="s-dir" placeholder="/path/to/downloads">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Concurrent Downloads (threads)</label>
+      <input type="number" id="s-threads" min="1" max="10" value="3">
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:4px">Restart server to apply thread changes.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let activePl    = null;
+let allPl       = {};
+let selected    = new Set();
+let pollTimer   = null;
+let panelOpen   = false;
+let lastJobsStr = '';
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await checkStatus();
+  await loadPlaylists();
+  setInterval(checkStatus, 20000);
+  // Always poll jobs so we can show the panel
+  setInterval(pollJobs, 1200);
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const d = await api('/api/status');
+    const ok = d.ytdlp;
+    document.getElementById('ydlp-dot').className = 'dot ' + (ok ? 'dot-green' : 'dot-red');
+    document.getElementById('ydlp-txt').textContent = ok ? 'yt-dlp ready' : 'yt-dlp missing';
+
+    const tc = document.getElementById('thread-chip');
+    const tt = document.getElementById('thread-txt');
+    if (d.threads) { tc.style.display = ''; tt.textContent = d.threads + ' threads'; }
+
+    updateActiveChip(d.active_jobs || 0, d.queued_jobs || 0);
+  } catch(e) {
+    document.getElementById('ydlp-txt').textContent = 'offline';
+  }
+}
+
+function updateActiveChip(active, queued) {
+  const chip = document.getElementById('active-chip');
+  const txt  = document.getElementById('active-txt');
+  if (active + queued > 0) {
+    chip.style.display = '';
+    txt.textContent = active + ' downloading' + (queued ? ', ' + queued + ' queued' : '');
+  } else {
+    chip.style.display = 'none';
+  }
+}
+
+// ── Playlists ─────────────────────────────────────────────────────────────────
+async function loadPlaylists() {
+  const d = await api('/api/playlists');
+  allPl = {};
+  for (const pl of d.playlists) allPl[pl.id] = pl;
+  renderSidebar();
+  if (activePl && allPl[activePl]) renderPlaylist(allPl[activePl]);
+}
+
+function renderSidebar() {
+  const el = document.getElementById('pl-list');
+  const pls = Object.values(allPl);
+  if (!pls.length) {
+    el.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:11px;text-align:center">No playlists yet.</div>';
+    return;
+  }
+  el.innerHTML = pls.map(pl => {
+    const done  = pl.videos.filter(v => v.downloaded).length;
+    const total = pl.videos.length;
+    const act   = activePl === pl.id ? ' active' : '';
+    return `<div class="pl-item${act}" onclick="selectPl('${pl.id}')">
+      <div class="pl-name">${esc(pl.title)}</div>
+      <div class="pl-meta">${done}/${total} downloaded</div>
+    </div>`;
+  }).join('');
+}
+
+function selectPl(id) {
+  activePl = id; selected.clear();
+  renderSidebar(); renderPlaylist(allPl[id]);
+  prefetchThumbs(allPl[id]);
+}
+
+function renderPlaylist(pl) {
+  const content = document.getElementById('content');
+  const done    = pl.videos.filter(v => v.downloaded).length;
+  const total   = pl.videos.length;
+
+  content.innerHTML = `
+    <div class="content-head">
+      <div style="flex:1">
+        <div class="content-title">${esc(pl.title)}</div>
+        <div class="content-sub">${total} videos &nbsp;·&nbsp;
+          <span style="color:var(--green)">${done} downloaded</span>
+          ${total-done ? ` &nbsp;·&nbsp; ${total-done} pending` : ''}</div>
+      </div>
+      <div class="content-actions">
+        <button class="btn btn-ghost btn-sm" onclick="syncPl('${pl.id}')">↻ Sync</button>
+        <button class="btn btn-ghost btn-sm" onclick="openAddVideo('${pl.id}')">+ Video</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePl('${pl.id}')">✕ Remove</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="checkbox" id="chk-all" onchange="toggleAll(this)"
+             style="accent-color:var(--red);width:13px;height:13px;cursor:pointer">
+      <span class="sel-badge" id="sel-badge">0 selected</span>
+      <div class="toolbar-sep"></div>
+      <button class="btn btn-green btn-sm" id="btn-dl" disabled onclick="downloadSelected('${pl.id}')">⬇ Download</button>
+      <button class="btn btn-danger btn-sm" id="btn-rm" disabled onclick="removeSelected('${pl.id}')">✕ Remove</button>
+    </div>
+
+    <div class="video-list" id="video-list-scroll">
+      <div class="vrow vrow-head">
+        <div></div><div>Thumb</div><div>Title</div>
+        <div style="text-align:center">Duration</div>
+        <div style="text-align:center">Status</div>
+        <div style="text-align:right">Actions</div>
+      </div>
+      <div id="vrows">
+        ${pl.videos.length
+          ? pl.videos.map(v => renderVrow(v, pl.id)).join('')
+          : '<div style="padding:40px;text-align:center;color:var(--muted)">No videos.</div>'
+        }
+      </div>
+    </div>`;
+}
+
+function renderVrow(v, plId) {
+  const dur   = v.duration ? fmt(v.duration) : '—';
+  const thumb = `<img class="thumb" src="/api/thumb/${v.id}" loading="lazy" onerror="this.style.opacity=0.3">`;
+
+
+  // Check if this video has an active job
+  const job = getJobForVideo(v.id);
+  let statusCell, rowClass = '';
+
+  if (job) {
+    rowClass = job.status === 'done' ? 'done-row' : 'downloading';
+    statusCell = jobStatusPill(job);
+  } else if (v.downloaded) {
+    statusCell = `<span class="pill pill-green">✓ saved</span>`;
+    rowClass   = 'done-row';
+  } else {
+    statusCell = `<span class="pill pill-gray">pending</span>`;
+  }
+
+  const actions = v.downloaded
+    ? `<a href="${esc(v.url)}" target="_blank" class="btn btn-ghost btn-sm">▶</a>
+       <span class="pill pill-green" title="${esc(v.file_path||'')}">📁</span>`
+    : `<a href="${esc(v.url)}" target="_blank" class="btn btn-ghost btn-sm">▶</a>
+       <button class="btn btn-green btn-sm" onclick="dlOne('${plId}','${v.id}')">⬇</button>`;
+
+  const inlineProgress = (job && job.status === 'running') ? `
+    <div class="vrow-progress">
+      <div class="vrow-progress-bar">
+        <div class="vrow-progress-fill" style="width:${job.progress||0}%"></div>
+      </div>
+      <div class="vrow-progress-info">
+        <span>${job.progress ? job.progress.toFixed(1)+'%' : ''}</span>
+        ${job.speed ? `<span style="color:var(--blue)">${esc(job.speed)}</span>` : ''}
+        ${job.eta   ? `<span>ETA ${esc(job.eta)}</span>` : ''}
+      </div>
+    </div>` : '';
+
+  return `<div class="vrow ${rowClass}" id="vrow-${v.id}">
+    <input type="checkbox" data-vid="${v.id}" onchange="toggleSel('${v.id}',this)">
+    ${thumb}
+    <div>
+      <div class="vtitle" title="${esc(v.title)}">${esc(v.title)}</div>
+      <div class="vup">${esc(v.uploader||'')}</div>
+      ${inlineProgress}
+    </div>
+    <div class="vdur">${dur}</div>
+    <div style="text-align:center">${statusCell}</div>
+    <div class="vactions">
+      ${actions}
+      <button class="btn btn-danger btn-sm" onclick="rmVideo('${plId}','${v.id}')">✕</button>
+    </div>
+  </div>`;
+}
+
+function jobStatusPill(job) {
+  if (job.status === 'queued')  return `<span class="pill pill-yellow">⏳ #${job.queue_pos}</span>`;
+  if (job.status === 'running') return `<span class="pill pill-blue"><span class="spinner"></span> ${job.phase||'…'}</span>`;
+  if (job.status === 'done')    return `<span class="pill pill-green">✓ saved</span>`;
+  if (job.status === 'error')   return `<span class="pill pill-red" title="${esc(job.error||'')}">✕ error</span>`;
+  return `<span class="pill pill-gray">${job.status}</span>`;
+}
+
+function getJobForVideo(videoId) {
+  // Get most recent non-cleared job for this video
+  const matching = Object.values(window._jobs || {}).filter(j => j.video_id === videoId);
+  if (!matching.length) return null;
+  return matching.sort((a,b) => (b.started||0) - (a.started||0))[0];
+}
+
+// ── Jobs polling ──────────────────────────────────────────────────────────────
+window._jobs = {};
+
+async function pollJobs() {
+  try {
+    const d = await api('/api/jobs');
+    const jobsStr = JSON.stringify(d.jobs);
+    if (jobsStr === lastJobsStr) return;
+    lastJobsStr = jobsStr;
+
+    window._jobs = {};
+    for (const j of d.jobs) window._jobs[j.id] = j;
+
+    const active  = d.jobs.filter(j => j.status === 'running').length;
+    const queued  = d.jobs.filter(j => j.status === 'queued').length;
+    const done    = d.jobs.filter(j => j.status === 'done').length;
+    const errored = d.jobs.filter(j => j.status === 'error').length;
+
+    updateActiveChip(active, queued);
+
+    // Show/open panel when there are active jobs
+    const panel = document.getElementById('dl-panel');
+    if (active + queued > 0) {
+      panel.classList.add('open');
+      panelOpen = true;
+    }
+
+    if (panelOpen || done + errored > 0) {
+      renderDlPanel(d.jobs);
+    }
+
+    // Update video rows in-place if playlist is displayed
+    if (activePl && allPl[activePl]) {
+      updateVrows(allPl[activePl]);
+    }
+
+    // Reload playlist data if any jobs just finished, preserving scroll position
+    const newlyDone = d.jobs.filter(j => j.status === 'done' && j.finished && (Date.now()/1000 - j.finished) < 3);
+    if (newlyDone.length) {
+      const vlist = document.getElementById('video-list-scroll');
+      const scrollTop = vlist ? vlist.scrollTop : 0;
+      await loadPlaylists();
+      // Restore scroll after DOM update
+      requestAnimationFrame(() => {
+        const vl = document.getElementById('video-list-scroll');
+        if (vl) vl.scrollTop = scrollTop;
+      });
+    }
+
+  } catch(e) { /* server might be busy */ }
+}
+
+function updateVrows(pl) {
+  pl.videos.forEach(v => {
+    const row = document.getElementById('vrow-' + v.id);
+    if (!row) return;
+    const job = getJobForVideo(v.id);
+
+    // Update inline progress
+    const prog = row.querySelector('.vrow-progress');
+    if (job && job.status === 'running') {
+      const pct = (job.progress || 0).toFixed(1);
+      if (prog) {
+        prog.querySelector('.vrow-progress-fill').style.width = pct + '%';
+        const infos = prog.querySelectorAll('.vrow-progress-info span');
+        if (infos[0]) infos[0].textContent = pct + '%';
+        if (infos[1] && job.speed) infos[1].textContent = job.speed;
+        if (infos[2] && job.eta)   infos[2].textContent = 'ETA ' + job.eta;
+      }
+      // Update row class
+      row.classList.add('downloading');
+      row.classList.remove('done-row');
+
+      // Update status cell
+      const statusCell = row.querySelector('.vactions').previousElementSibling;
+      if (statusCell) statusCell.innerHTML = jobStatusPill(job);
+    } else if (job && job.status === 'done') {
+      row.classList.add('done-row');
+      row.classList.remove('downloading');
+    } else if (job && job.status === 'queued') {
+      const statusCell = row.querySelector('.vactions').previousElementSibling;
+      if (statusCell) statusCell.innerHTML = jobStatusPill(job);
+    }
+  });
+}
+
+function renderDlPanel(jobsList) {
+  // Sort: running first, then queued, then done/error
+  const order = {running:0, queued:1, done:2, error:3};
+  const sorted = [...jobsList].sort((a,b) => (order[a.status]||99) - (order[b.status]||99));
+
+  const active  = jobsList.filter(j => j.status === 'running').length;
+  const queued  = jobsList.filter(j => j.status === 'queued').length;
+  const done    = jobsList.filter(j => j.status === 'done').length;
+  const errored = jobsList.filter(j => j.status === 'error').length;
+
+  document.getElementById('panel-running').textContent = active + ' active';
+  const qEl = document.getElementById('panel-queued');
+  const dEl = document.getElementById('panel-done');
+  qEl.style.display = queued  ? '' : 'none'; qEl.textContent = queued + ' queued';
+  dEl.style.display = (done+errored) ? '' : 'none'; dEl.textContent = (done+errored) + ' done';
+
+  const body = document.getElementById('dl-body');
+  body.innerHTML = sorted.map(j => {
+    const pct   = j.status === 'queued' ? 0 : (j.progress || 0);
+    const title = esc(j.title || j.video_id);
+    const phase = j.status === 'error' ? 'error' : (j.phase || j.status);
+
+    let pctText = '';
+    if      (j.status === 'done')    pctText = '100%';
+    else if (j.status === 'queued')  pctText = `#${j.queue_pos}`;
+    else if (j.status === 'error')   pctText = 'ERR';
+    else                             pctText = pct.toFixed(1) + '%';
+
+    const errTip = j.error ? ` title="${esc(j.error)}"` : '';
+
+    return `<div class="dl-row"${errTip}>
+      <div class="dl-title" title="${title}">${title}</div>
+      <div class="dl-bar-wrap">
+        <div class="dl-bar">
+          <div class="dl-bar-fill ${j.status}" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="phase-tag ${phase}">${phase}</span>
+      </div>
+      <div class="dl-speed">${j.speed ? esc(j.speed) : (j.size ? esc(j.size) : '')}</div>
+      <div class="dl-eta">${j.eta ? 'ETA ' + esc(j.eta) : (j.size && j.status==='running' ? esc(j.size) : '')}</div>
+      <div class="dl-pct">${pctText}</div>
+    </div>`;
+  }).join('');
+}
+
+function togglePanel() {
+  const panel = document.getElementById('dl-panel');
+  panelOpen = !panelOpen;
+  if (panelOpen) panel.classList.add('open');
+  else panel.classList.remove('open');
+}
+
+async function clearFinished() {
+  await api('/api/jobs/clear', 'POST', {});
+  lastJobsStr = '';
+  window._jobs = {};
+  const stillActive = Object.values(window._jobs).some(j => j.status === 'running' || j.status === 'queued');
+  if (!stillActive) {
+    document.getElementById('dl-panel').classList.remove('open');
+    panelOpen = false;
+  }
+  document.getElementById('dl-body').innerHTML = '';
+}
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+function toggleSel(id, cb) {
+  if (cb.checked) selected.add(id); else selected.delete(id);
+  updateSelUI();
+}
+function toggleAll(cb) {
+  document.querySelectorAll('[data-vid]').forEach(b => {
+    b.checked = cb.checked;
+    if (cb.checked) selected.add(b.dataset.vid); else selected.delete(b.dataset.vid);
+  });
+  updateSelUI();
+}
+function updateSelUI() {
+  const n = selected.size;
+  const badge = document.getElementById('sel-badge');
+  if (badge) badge.textContent = n + ' selected';
+  const dl = document.getElementById('btn-dl');
+  const rm = document.getElementById('btn-rm');
+  if (dl) dl.disabled = n === 0;
+  if (rm) rm.disabled = n === 0;
+}
+
+// ── Download actions ──────────────────────────────────────────────────────────
+function downloadSelected(plId) {
+  if (!selected.size) return;
+  document.getElementById('dl-count').textContent = selected.size;
+  document.getElementById('m-dl').dataset.plId = plId;
+  openModal('m-dl');
+}
+function dlOne(plId, vidId) {
+  selected.clear(); selected.add(vidId);
+  document.getElementById('dl-count').textContent = 1;
+  document.getElementById('m-dl').dataset.plId = plId;
+  openModal('m-dl');
+}
+
+async function startDownload() {
+  const plId     = document.getElementById('m-dl').dataset.plId;
+  const quality  = document.getElementById('dl-quality').value;
+  const audioOnly = document.getElementById('dl-audio').checked;
+  closeModal('m-dl');
+  const d = await api('/api/download', 'POST', {
+    playlist_id: plId, video_ids: [...selected], quality, audio_only: audioOnly
+  });
+  if (d.error) return toast(d.error, 'err');
+  selected.clear(); updateSelUI();
+  toast(`⬇ Queued ${d.jobs.length} download(s)`);
+  // Open the panel immediately
+  document.getElementById('dl-panel').classList.add('open');
+  panelOpen = true;
+  lastJobsStr = ''; // force repaint
+}
+
+// ── Playlist actions ──────────────────────────────────────────────────────────
+async function syncPl(id) {
+  toast('Syncing…');
+  const d = await api('/api/playlist/sync', 'POST', {id});
+  if (d.error) return toast(d.error, 'err');
+  allPl[id] = d; renderSidebar(); renderPlaylist(d);
+  toast('✓ Synced!', 'ok');
+}
+
+async function deletePl(id) {
+  if (!confirm('Remove playlist from YT-Sync? (Downloaded files kept.)')) return;
+  await api(`/api/playlist/${id}`, 'DELETE');
+  delete allPl[id]; activePl = null;
+  renderSidebar();
+  document.getElementById('content').innerHTML = `
+    <div class="empty"><div class="empty-icon">🗑</div><div class="empty-title">Playlist removed</div></div>`;
+  toast('Removed');
+}
+
+async function removeSelected(plId) {
+  for (const vid of selected) {
+    await api('/api/video/remove', 'DELETE', {playlist_id: plId, video_id: vid});
+  }
+  selected.clear();
+  await loadPlaylists();
+  if (allPl[plId]) renderPlaylist(allPl[plId]);
+  toast('Removed selected');
+}
+
+async function rmVideo(plId, vidId) {
+  await api('/api/video/remove', 'DELETE', {playlist_id: plId, video_id: vidId});
+  await loadPlaylists();
+  if (allPl[plId]) renderPlaylist(allPl[plId]);
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+function openAddPlaylist() { document.getElementById('add-url').value = ''; openModal('m-add'); setTimeout(() => document.getElementById('add-url').focus(), 80); }
+function openAddVideo(plId) { document.getElementById('addvid-url').value = ''; document.getElementById('m-addvid').dataset.plId = plId; openModal('m-addvid'); setTimeout(() => document.getElementById('addvid-url').focus(), 80); }
+async function openSettings() {
+  const d = await api('/api/settings');
+  document.getElementById('s-dir').value     = d.download_dir || '';
+  document.getElementById('s-threads').value = d.threads || 3;
+  openModal('m-settings');
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if (e.target===bg) bg.classList.remove('open'); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('open')); });
+
+async function addPlaylist() {
+  const url = document.getElementById('add-url').value.trim();
+  if (!url) return toast('Enter a URL', 'err');
+  closeModal('m-add'); toast('Fetching info…');
+  const d = await api('/api/playlist/add', 'POST', {url});
+  if (d.error) return toast(d.error, 'err');
+  allPl[d.id] = d; renderSidebar(); selectPl(d.id);
+  toast(`✓ Added: ${d.title}`, 'ok');
+}
+
+async function addVideo() {
+  const url   = document.getElementById('addvid-url').value.trim();
+  const plId  = document.getElementById('m-addvid').dataset.plId;
+  if (!url) return toast('Enter a URL', 'err');
+  closeModal('m-addvid'); toast('Adding…');
+  const d = await api('/api/video/add', 'POST', {playlist_id: plId, url});
+  if (d.error) return toast(d.error, 'err');
+  await loadPlaylists();
+  if (allPl[plId]) renderPlaylist(allPl[plId]);
+  toast(`✓ Added ${d.added.length} video(s)`, 'ok');
+}
+
+async function saveSettings() {
+  const dir     = document.getElementById('s-dir').value.trim();
+  const threads = parseInt(document.getElementById('s-threads').value) || 3;
+  await api('/api/settings/update', 'POST', {download_dir: dir, threads});
+  closeModal('m-settings');
+  toast('Saved. Restart to apply thread changes.', 'ok');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body !== null) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function fmt(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _toastTimer;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show' + (type === 'err' ? ' t-err' : type === 'ok' ? ' t-ok' : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.className = '', 3500);
+}
+
+
+// Prefetch thumbnails in background
+async function prefetchThumbs(pl) {
+  if (!pl || !pl.videos || !pl.videos.length) return;
+  const ids = pl.videos.map(v => v.id).filter(Boolean).slice(0, 50);
+  if (!ids.length) return;
+  try {
+    await fetch(`/api/thumbs/prefetch?ids=${ids.join(',')}`);
+  } catch(e) { /* ignore prefetch errors */ }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -151,7 +151,7 @@ header {
 
 .vrow {
   display: grid;
-  grid-template-columns: 26px 60px 1fr 72px 100px 100px;
+  grid-template-columns: 26px 60px 1fr 72px 100px 140px;
   align-items: center; gap: 10px;
   padding: 8px 24px;
   border-bottom: 1px solid rgba(255,255,255,.04);
@@ -602,6 +602,7 @@ function renderPlaylist(pl) {
       <span class="sel-badge" id="sel-badge">0 selected</span>
       <div class="toolbar-sep"></div>
       <button class="btn btn-green btn-sm" id="btn-dl" disabled onclick="downloadSelected('${pl.id}')">⬇ Download</button>
+      <button class="btn btn-danger btn-sm" id="btn-delf" disabled onclick="deleteSelectedFiles('${pl.id}')">🗑 Delete files</button>
       <button class="btn btn-danger btn-sm" id="btn-rm" disabled onclick="removeSelected('${pl.id}')">✕ Remove</button>
     </div>
 
@@ -640,10 +641,12 @@ function renderVrow(v, plId) {
     statusCell = `<span class="pill pill-gray">pending</span>`;
   }
 
+  const isAud = v.audio_only || /\.mp3$/i.test(v.file_path||'');
   const actions = v.downloaded
-    ? `<a href="${esc(v.url)}" target="_blank" class="btn btn-ghost btn-sm">▶</a>
-       <span class="pill pill-green" title="${esc(v.file_path||'')}">📁</span>`
-    : `<a href="${esc(v.url)}" target="_blank" class="btn btn-ghost btn-sm">▶</a>
+    ? `<span class="pill ${isAud ? 'pill-yellow' : 'pill-blue'}" title="${isAud ? 'Audio' : 'Video'}: ${esc(v.file_path||'')}">${isAud ? '♪' : '▶'}</span>
+       <button class="btn btn-ghost btn-sm" onclick="redownload('${plId}','${v.id}')" title="Re-download with different settings">↻</button>
+       <button class="btn btn-danger btn-sm" onclick="deleteFile('${plId}','${v.id}')" title="Delete file from disk">🗑</button>`
+    : `<a href="${esc(v.url)}" target="_blank" class="btn btn-ghost btn-sm" title="Open on YouTube">▶</a>
        <button class="btn btn-green btn-sm" onclick="dlOne('${plId}','${v.id}')">⬇</button>`;
 
   const inlineProgress = (job && job.status === 'running') ? `
@@ -858,10 +861,12 @@ function updateSelUI() {
   const n = selected.size;
   const badge = document.getElementById('sel-badge');
   if (badge) badge.textContent = n + ' selected';
-  const dl = document.getElementById('btn-dl');
-  const rm = document.getElementById('btn-rm');
-  if (dl) dl.disabled = n === 0;
-  if (rm) rm.disabled = n === 0;
+  const dl   = document.getElementById('btn-dl');
+  const rm   = document.getElementById('btn-rm');
+  const delf = document.getElementById('btn-delf');
+  if (dl)   dl.disabled   = n === 0;
+  if (rm)   rm.disabled   = n === 0;
+  if (delf) delf.disabled = n === 0;
 }
 
 // ── Download actions ──────────────────────────────────────────────────────────
@@ -879,10 +884,18 @@ function dlOne(plId, vidId) {
 }
 
 async function startDownload() {
-  const plId     = document.getElementById('m-dl').dataset.plId;
-  const quality  = document.getElementById('dl-quality').value;
+  const modal     = document.getElementById('m-dl');
+  const plId      = modal.dataset.plId;
+  const quality   = document.getElementById('dl-quality').value;
   const audioOnly = document.getElementById('dl-audio').checked;
+  const isRedownload = modal.dataset.redownload === 'true';
+  delete modal.dataset.redownload;
   closeModal('m-dl');
+  if (isRedownload) {
+    await api('/api/video/delete-file', 'POST', {
+      playlist_id: plId, video_ids: [...selected]
+    });
+  }
   const d = await api('/api/download', 'POST', {
     playlist_id: plId, video_ids: [...selected], quality, audio_only: audioOnly
   });
@@ -928,6 +941,39 @@ async function rmVideo(plId, vidId) {
   await api('/api/video/remove', 'DELETE', {playlist_id: plId, video_id: vidId});
   await loadPlaylists();
   if (allPl[plId]) renderPlaylist(allPl[plId]);
+}
+
+async function deleteFile(plId, vidId) {
+  if (!confirm('Delete this file from disk?')) return;
+  const d = await api('/api/video/delete-file', 'POST', {playlist_id: plId, video_ids: [vidId]});
+  if (d.error) return toast(d.error, 'err');
+  toast('File deleted', 'ok');
+  await loadPlaylists();
+  if (allPl[plId]) renderPlaylist(allPl[plId]);
+}
+
+async function deleteSelectedFiles(plId) {
+  const dlIds = [...selected].filter(vid => {
+    const pl = allPl[plId];
+    return pl && pl.videos.some(v => v.id === vid && v.downloaded);
+  });
+  if (!dlIds.length) return toast('No downloaded files in selection', 'err');
+  if (!confirm('Delete ' + dlIds.length + ' file(s) from disk?')) return;
+  const d = await api('/api/video/delete-file', 'POST', {playlist_id: plId, video_ids: dlIds});
+  if (d.error) return toast(d.error, 'err');
+  toast('Deleted ' + d.deleted + ' file(s)', 'ok');
+  selected.clear();
+  await loadPlaylists();
+  if (allPl[plId]) renderPlaylist(allPl[plId]);
+}
+
+function redownload(plId, vidId) {
+  selected.clear();
+  selected.add(vidId);
+  document.getElementById('dl-count').textContent = 1;
+  document.getElementById('m-dl').dataset.plId = plId;
+  document.getElementById('m-dl').dataset.redownload = 'true';
+  openModal('m-dl');
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────

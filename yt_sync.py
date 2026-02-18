@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+import urllib.request
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -393,6 +394,68 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_file(fpath)
             return
 
+        # ── Thumbnails ──
+        if path.startswith("/api/thumb/") and not path.startswith("/api/thumbs/"):
+            video_id = path.split("/")[-1]
+            if not re.match(r'^[a-zA-Z0-9_-]+$', video_id):
+                self.send_response(400)
+                self.end_headers()
+                return
+            cache_file = THUMB_CACHE_DIR / f"{video_id}.jpg"
+            if not cache_file.exists():
+                try:
+                    urllib.request.urlretrieve(
+                        f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+                        str(cache_file)
+                    )
+                except Exception:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+            body = cache_file.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == "/api/thumbs/prefetch":
+            query = urlparse(self.path).query
+            ids = []
+            for param in query.split("&"):
+                if param.startswith("ids="):
+                    ids = [i.strip() for i in param[4:].split(",") if i.strip()]
+                    break
+
+            def _batch_fetch(video_ids):
+                def _fetch_one(vid_id):
+                    if not re.match(r'^[a-zA-Z0-9_-]+$', vid_id):
+                        return
+                    cf = THUMB_CACHE_DIR / f"{vid_id}.jpg"
+                    if cf.exists():
+                        return
+                    try:
+                        urllib.request.urlretrieve(
+                            f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
+                            str(cf)
+                        )
+                    except Exception:
+                        pass
+
+                threads = []
+                for vid_id in video_ids[:50]:
+                    t = threading.Thread(target=_fetch_one, args=(vid_id,), daemon=True)
+                    t.start()
+                    threads.append(t)
+                for t in threads:
+                    t.join(timeout=15)
+
+            threading.Thread(target=_batch_fetch, args=(ids,), daemon=True).start()
+            self.send_json({"queued": len(ids)})
+            return
+
         # ── API ──
         if path == "/api/status":
             with jobs_lock:
@@ -520,6 +583,35 @@ class Handler(BaseHTTPRequestHandler):
                 for jid in done:
                     del jobs[jid]
             self.send_json({"cleared": len(done)})
+
+        elif path == "/api/video/delete-file":
+            pl_id     = body.get("playlist_id")
+            video_ids = body.get("video_ids", [])
+            if isinstance(video_ids, str):
+                video_ids = [video_ids]
+            if not pl_id or not video_ids:
+                return self.send_json({"error": "playlist_id and video_ids required"}, 400)
+            deleted = 0
+            with data_lock:
+                data = load_data()
+                pl   = data["playlists"].get(pl_id)
+                if not pl:
+                    return self.send_json({"error": "Playlist not found"}, 404)
+                for v in pl["videos"]:
+                    if v["id"] in video_ids and v.get("file_path"):
+                        try:
+                            fpath = Path(v["file_path"])
+                            if fpath.exists():
+                                fpath.unlink()
+                                deleted += 1
+                        except Exception:
+                            pass
+                        v["downloaded"] = False
+                        v["file_path"]  = None
+                        v.pop("quality", None)
+                        v.pop("audio_only", None)
+                save_data(data)
+            self.send_json({"deleted": deleted})
 
         else:
             self.send_json({"error": "Not found"}, 404)

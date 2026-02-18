@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+from urllib.request import urlretrieve
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,44 @@ def fetch_playlist_info(url):
         "title":  data.get("title", data.get("webpage_url_basename", "Playlist")),
         "videos": videos,
     }
+
+# ─── Thumbnail helpers ────────────────────────────────────────────────────────
+
+def get_thumb_path(video_id: str) -> Path:
+    return THUMB_CACHE_DIR / f"{video_id}.jpg"
+
+def download_thumbnail(video_id: str, thumb_url: str) -> bool:
+    """Download a thumbnail and cache it locally. Returns True on success."""
+    if not thumb_url:
+        return False
+    dest = get_thumb_path(video_id)
+    if dest.exists():
+        return True  # already cached
+    try:
+        # yt-dlp provides several thumbnail sizes; prefer maxresdefault
+        # but fall back to whatever URL is in the data
+        best_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
+        try:
+            urlretrieve(best_url, dest)
+            return True
+        except Exception:
+            pass
+        # Fallback to the URL stored in playlist data
+        urlretrieve(thumb_url, dest)
+        return True
+    except Exception as e:
+        print(f"[Thumbnail] Failed for {video_id}: {e}")
+        return False
+
+def ensure_playlist_thumbnails(pl: dict):
+    """Background: download missing thumbnails for all videos in a playlist."""
+    def _run():
+        for v in pl.get("videos", []):
+            vid_id = v.get("id", "")
+            url    = v.get("thumbnail", "")
+            if vid_id and not get_thumb_path(vid_id).exists():
+                download_thumbnail(vid_id, url)
+    threading.Thread(target=_run, daemon=True).start()
 
 # ─── Progress parsing ─────────────────────────────────────────────────────────
 
@@ -250,6 +289,12 @@ def _run_job(job_id):
                             v["file_path"]  = output_file
                             v["quality"]    = jobs[job_id]["quality"]
                             v["audio_only"] = jobs[job_id]["audio_only"]
+                            # Cache thumbnail in background
+                            threading.Thread(
+                                target=download_thumbnail,
+                                args=(v["id"], v.get("thumbnail", "")),
+                                daemon=True,
+                            ).start()
                             break
                     save_data(data)
         else:
@@ -374,6 +419,36 @@ class Handler(BaseHTTPRequestHandler):
                            200 if ui.exists() else 404)
             return
 
+        # ── Thumbnail serving ──
+        # /api/thumb/<video_id>
+        if path.startswith("/api/thumb/"):
+            vid_id = path.split("/")[-1]
+            thumb  = get_thumb_path(vid_id)
+            if not thumb.exists():
+                # Try to fetch on-demand using stored URL
+                data  = load_data()
+                found = False
+                for pl in data["playlists"].values():
+                    for v in pl.get("videos", []):
+                        if v.get("id") == vid_id:
+                            download_thumbnail(vid_id, v.get("thumbnail", ""))
+                            found = True
+                            break
+                    if found:
+                        break
+            if thumb.exists():
+                img_bytes = thumb.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(img_bytes)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(img_bytes)
+            else:
+                self.send_response(404)
+                self.end_headers()
+            return
+
         # ── Media streaming ──
         # /api/stream/<playlist_id>/<video_id>
         if path.startswith("/api/stream/"):
@@ -448,6 +523,7 @@ class Handler(BaseHTTPRequestHandler):
                     data["playlists"][pl_id] = pl
                     save_data(data)
                 self.send_json(pl)
+                ensure_playlist_thumbnails(pl)
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
 
@@ -470,6 +546,7 @@ class Handler(BaseHTTPRequestHandler):
                     data["playlists"][pl_id] = pl
                     save_data(data)
                 self.send_json(pl)
+                ensure_playlist_thumbnails(pl)
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
 

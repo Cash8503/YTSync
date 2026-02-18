@@ -361,17 +361,16 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         # ── Pages ──
-        if path in ("/", "/index.html"):
+        if path in ("/", "/player"):
+            ui = Path(__file__).parent / "yt_sync_player.html"
+            self.send_html(ui.read_text(encoding="utf-8") if ui.exists()
+                           else "<h1>Player UI not found</h1>", 200 if ui.exists() else 404)
+            return
+
+        if path in ("/editor", "/index.html"):
             ui = Path(__file__).parent / "yt_sync_ui.html"
             self.send_html(ui.read_text(encoding="utf-8") if ui.exists()
                            else "<h1>Manager UI not found</h1>", 200 if ui.exists() else 404)
-            return
-
-        if path == "/player":
-            ui = Path(__file__).parent / "yt_sync_player.html"
-            self.send_html(ui.read_text(encoding="utf-8") if ui.exists()
-                           else "<h1>Player UI not found — create yt_sync_player.html</h1>",
-                           200 if ui.exists() else 404)
             return
 
         # ── Media streaming ──
